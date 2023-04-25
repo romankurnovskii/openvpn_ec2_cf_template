@@ -1,5 +1,10 @@
 #!/bin/bash
 
+if [ "$#" -ne 2 ]; then
+    echo "Usage: $0 <s3_bucket_name> <elastic_ip>"
+    exit 1
+fi
+
 set -eux
 
 HERE=$(dirname "$0")
@@ -22,5 +27,5 @@ rm -f "/etc/openvpn/${CLIENT_NAME}.ovpn"
 apt-get install -y unattended-upgrades update-notifier-common
 dpkg-reconfigure --frontend noninteractive --priority=low unattended-upgrades
 AUC=/etc/apt/apt.conf.d/20auto-upgrades
-echo "APT::Periodic::Verbose \"1\";" >> "$AUC"
-echo "Unattended-Upgrade::Automatic-Reboot \"true\";" >> "$AUC"
+echo "APT::Periodic::Verbose \"1\";" >>"$AUC"
+echo "Unattended-Upgrade::Automatic-Reboot \"true\";" >>"$AUC"

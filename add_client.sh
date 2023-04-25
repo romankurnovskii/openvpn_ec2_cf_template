@@ -6,7 +6,7 @@ HERE=$(dirname "$0")
 KEY_DIR='/etc/openvpn'
 
 usage_and_exit() {
-    echo "$0 <client-name> <ip>"
+    printf "%s <client-name> <ip>\n" "$0"
     exit 1
 }
 
@@ -19,16 +19,20 @@ CLIENT_NAME="$1"
 IP="$2"
 
 CLIENT_CONFIG="/etc/openvpn/${CLIENT_NAME}.ovpn"
+
+# Check if the client configuration file already exists
 if [ -f "$CLIENT_CONFIG" ]
 then
-    echo "\"$CLIENT_CONFIG\" already exists"
-    echo "Please choose a different client name"
+    printf "\"%s\" already exists\n" "$CLIENT_CONFIG"
+    printf "Please choose a different client name\n"
     exit 1
 fi
+
 touch "$CLIENT_CONFIG"
 chmod 600 "$CLIENT_CONFIG"
 chown ubuntu "$CLIENT_CONFIG"
 
+# OpenVPN client configuration options
 cat <<EOF >> "$CLIENT_CONFIG"
 client
 dev tun
