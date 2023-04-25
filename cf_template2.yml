@@ -1,0 +1,203 @@
+AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+  InstanceType:
+    Default: t4g.nano
+    Type: String
+    ConstraintDescription: must be a valid EC2 instance type.
+    Description: EC2 instance type
+    AllowedValues:
+      - t4g.nano
+      - t2.micro
+      - t3.nano
+      - t3.micro
+Description: >-
+  Create a new EC2 instance and give VPN access. **WARNING** This template
+  creates an Amazon EC2 instance. You will be billed for the AWS resources used
+  if you create a stack from this template.
+Resources:
+  EC2Instance:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      IamInstanceProfile: !Ref InstanceProfile
+      SecurityGroups:
+        - !Ref InstanceSecurityGroup
+      InstanceType: !Ref InstanceType
+      LaunchTemplate:
+        Version: '1'
+        LaunchTemplateId: !Ref LaunchTemplate
+      ImageId: "ami-039abd9eac9919823"
+      UserData: !Base64 
+        'Fn::Join':
+          - ''
+          - - |
+              #!/bin/bash
+            - |
+              set -eux
+            - |
+              apt-get update && apt-get install python-pip --assume-yes
+            - >
+              pip install
+              https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz
+            - >
+              git clone
+              https://github.com/romankurnovskii/openvpn_ec2_cf_template.git
+              /home/ubuntu/openvpn_on_ec2
+            - |
+              cd /home/ubuntu/openvpn_on_ec2
+            - './setup_ec2.sh '
+            - !Ref S3Bucket
+            - ' '
+            - !Ref IPAddress
+            - |+
+
+            - '/usr/local/bin/cfn-signal --stack '
+            - !Ref 'AWS::StackName'
+            - ' --resource EC2Instance --region '
+            - !Ref 'AWS::Region'
+            - |2
+               
+      Tags:
+        - Key: openvpn_on_ec2
+          Value: 'true'
+    CreationPolicy:
+      ResourceSignal:
+        Timeout: PT5M
+  LaunchTemplate:
+    Type: 'AWS::EC2::LaunchTemplate'
+    Properties:
+      LaunchTemplateData:
+        InstanceMarketOptions:
+          SpotOptions:
+            SpotInstanceType: persistent
+            InstanceInterruptionBehavior: stop
+          MarketType: spot
+  S3Bucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      Tags:
+        - Key: openvpn_on_ec2
+          Value: 'true'
+  InstanceProfile:
+    Type: 'AWS::IAM::InstanceProfile'
+    Properties:
+      Roles:
+        - !Ref Role
+  Role:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      Policies:
+        - PolicyName: OpenVPNClientKeyS3
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Action:
+                  - 's3:PutObject'
+                  - 's3:GetObject'
+                  - 's3:ListObject'
+                Resource:
+                  - !Join 
+                    - ''
+                    - - !GetAtt 
+                        - S3Bucket
+                        - Arn
+                      - /*
+                Effect: Allow
+                Sid: VisualEditor0
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - 'sts:AssumeRole'
+            Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+      Tags:
+        - Key: openvpn_on_ec2
+          Value: 'true'
+  IPAssoc:
+    Type: 'AWS::EC2::EIPAssociation'
+    Properties:
+      InstanceId: !Ref EC2Instance
+      EIP: !Ref IPAddress
+  InstanceSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      SecurityGroupIngress:
+        - ToPort: 1194
+          FromPort: 1194
+          IpProtocol: udp
+          CidrIp: 0.0.0.0/0
+        - ToPort: 22
+          FromPort: 22
+          IpProtocol: tcp
+          CidrIp: 0.0.0.0/0
+      GroupDescription: Enable VPN access via UDP port 1194 and SSH access on port 22
+      Tags:
+        - Key: openvpn_on_ec2
+          Value: 'true'
+  IPAddress:
+    Type: 'AWS::EC2::EIP'
+    Properties:
+      Tags:
+        - Key: openvpn_on_ec2
+          Value: 'true'
+Mappings:
+  AWSInstanceType2Arch:
+    t2.micro:
+      Arch: HVM64
+    t3.micro:
+      Arch: HVM64
+    t3.nano:
+      Arch: HVM64
+  AWSRegionArch2AMI:
+    us-west-1:
+      HVM64: ami-0f42d8c4eb586ccf7
+    ap-east-1:
+      HVM64: ami-dc98e2ad
+    ap-northeast-3:
+      HVM64: ami-05f50017c0424c060
+    us-east-1:
+      HVM64: ami-00a208c7cdba991ea
+    ap-northeast-1:
+      HVM64: ami-0f6b4f4104d26f399
+    sa-east-1:
+      HVM64: ami-049f5d88d2d436431
+    ap-northeast-2:
+      HVM64: ami-02b4a5559ce53a570
+    us-east-2:
+      HVM64: ami-059d836af932792c3
+    ap-southeast-1:
+      HVM64: ami-07febfdfb4080320e
+    ca-central-1:
+      HVM64: ami-0972a0d3135cf1fc0
+    ap-southeast-2:
+      HVM64: ami-04a0f7552cff370ba
+    us-west-2:
+      HVM64: ami-0a7d051a1c4b54f65
+    eu-north-1:
+      HVM64: ami-005bc7d72deb72a3d
+    me-south-1:
+      HVM64: ami-026d8603b92fddf7a
+    ap-south-1:
+      HVM64: ami-0245841fc4b40e22f
+    eu-central-1:
+      HVM64: ami-09356619876445425
+    eu-west-1:
+      HVM64: ami-039abd9eac9919823
+    eu-west-2:
+      HVM64: ami-00622b440d92e55c0
+    eu-west-3:
+      HVM64: ami-0b70d1460d5c7a299
+Outputs:
+  ClientConfigurationUrl:
+    Description: URL to the VPN client configuration/key file to download
+    Value: !Join 
+      - /
+      - - 'https://s3.console.aws.amazon.com/s3/object'
+        - !Ref S3Bucket
+        - client.ovpn
