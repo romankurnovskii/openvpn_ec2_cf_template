@@ -19,6 +19,40 @@ A quick and easy way to set up and maintain your own VPN using the open-source v
 - Once the stack creation is complete, go to the **Outputs** tab in CloudFormation to find the S3 URL for your client configuration
 - Download the client configuration file (`client.ovpn`) and use it with your OpenVPN client software
 
+### From CLI
+
+```
+
+stack_name=MyStack
+
+aws cloudformation create-stack --stack-name "$stack_name"  --capabilities CAPABILITY_NAMED_IAM --template-body file:///Users/r/Desktop/github/openvpn_ec2_cf_template/cf_template.yml
+
+aws cloudformation describe-stacks --stack-name "$stack_name" 
+# aws cloudformation describe-stacks --stack-name "$stack_name"  --query "Stacks[0].Outputs"
+# aws cloudformation describe-stack-events --stack-name "$stack_name" 
+
+output_json=$(aws cloudformation describe-stacks --stack-name "$stack_name" --query "Stacks[0].Outputs")
+echo $output_json
+
+s3_url=$(echo $output_json | jq -r '.[] | select(.OutputKey=="ClientConfigurationUrl").OutputValue' | sed 's|https://s3.console.aws.amazon.com/s3/object/||')
+
+bucket_name=$(echo $s3_url | cut -d '/' -f 1)
+echo "bucket_name: $bucket_name"
+
+s3_file="s3://${s3_url}"
+echo "s3_file: $s3_file"
+
+aws s3 cp "$s3_file" .
+
+# ==== remove
+aws s3 rm "s3://${bucket_name}/" --recursive
+aws s3 ls "s3://${bucket_name}/"
+
+# aws s3api delete-bucket --bucket your-bucket-name
+
+aws cloudformation delete-stack --stack-name "$stack_name" 
+```
+
 ## Details
 
 ### Cost
